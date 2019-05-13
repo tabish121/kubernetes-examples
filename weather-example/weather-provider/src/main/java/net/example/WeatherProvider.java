@@ -87,6 +87,12 @@ public class WeatherProvider extends AbstractVerticle {
         LOG.info("Weather Provider verticale started on {}:{}", httpHost, httpPort);
     }
 
+    @Override
+    public void stop(Future<Void> stopFuture) throws Exception {
+        messagingClient.shutdown();
+        stopFuture.complete();
+    }
+
     private void publishWeatherData() {
         if (latestWeatherUpdate != null) {
             messagingClient.sendMessage(latestWeatherUpdate, "current:zipcode:22314");

@@ -16,7 +16,6 @@
  */
 package net.example;
 
-import org.apache.qpid.proton.amqp.Symbol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,16 +26,11 @@ import io.vertx.core.http.HttpServerResponse;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
-import io.vertx.ext.web.client.WebClient;
-import io.vertx.ext.web.client.WebClientOptions;
 
 public class WeatherFrontend extends AbstractVerticle {
 
     private static Logger LOG = LoggerFactory.getLogger(WeatherFrontend.class);
 
-    public static final Symbol QUEUE_CAPABILITY = Symbol.valueOf("queue");
-
-    private WebClient weatherAPIClient;
     private MessagingClient messagingClient;
 
     private String messagingHost;
@@ -52,7 +46,6 @@ public class WeatherFrontend extends AbstractVerticle {
     public void start(Future<Void> start) throws Exception {
         initializeServiceConfiguration();
 
-        weatherAPIClient = createAndConfigureWebClient();
         messagingClient = createAndConfigureMessagingClient();
 
         // Routes for this service to check status and monitor health
@@ -73,13 +66,10 @@ public class WeatherFrontend extends AbstractVerticle {
         LOG.info("Weather API service started on {}:{}", httpHost, httpPort);
     }
 
-    private WebClient createAndConfigureWebClient() {
-        WebClientOptions options = new WebClientOptions();
-
-        options.setUserAgent("WeatherProvider/1.0.0");
-        options.setKeepAlive(false);
-
-        return WebClient.create(vertx, options);
+    @Override
+    public void stop(Future<Void> stopFuture) throws Exception {
+        messagingClient.shutdown();
+        stopFuture.complete();
     }
 
     private MessagingClient createAndConfigureMessagingClient() {
@@ -87,6 +77,9 @@ public class WeatherFrontend extends AbstractVerticle {
             getVertx(), messagingHost, messagingPort, "weather.current.zipcode.22314", "weather");
 
         messagingClient.connect();
+        messagingClient.subscribe("current:zipcode:22314", latestData -> {
+            latestWeatherUpdate = new JsonObject(latestData);
+        });
 
         return messagingClient;
     }

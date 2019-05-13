@@ -16,23 +16,22 @@
  */
 package net.example;
 
-import static io.vertx.proton.ProtonHelper.message;
-
 import java.time.Instant;
-import java.util.LinkedHashMap;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.function.Consumer;
 
 import org.apache.qpid.proton.amqp.Symbol;
-import org.apache.qpid.proton.amqp.messaging.ApplicationProperties;
-import org.apache.qpid.proton.amqp.messaging.Target;
-import org.apache.qpid.proton.message.Message;
+import org.apache.qpid.proton.amqp.messaging.AmqpValue;
+import org.apache.qpid.proton.amqp.messaging.Source;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import io.vertx.core.Vertx;
-import io.vertx.core.json.JsonObject;
 import io.vertx.proton.ProtonClient;
 import io.vertx.proton.ProtonConnection;
-import io.vertx.proton.ProtonSender;
+import io.vertx.proton.ProtonReceiver;
 
 public class MessagingClient {
 
@@ -55,6 +54,8 @@ public class MessagingClient {
 
     private ProtonConnection connection;
 
+    private Map<String, Consumer<String>> subscriptions = new HashMap<>();
+
     // Reconnection delay tracking
     private int nextDelay;
 
@@ -73,27 +74,23 @@ public class MessagingClient {
         tryConnect();
     }
 
-    public void sendMessage(JsonObject weatherData, String dataContext) {
-        if (connection != null) {
-            ProtonSender sender = connection.createSender(address);
-            ((Target) sender.getTarget()).setCapabilities(QUEUE_CAPABILITY);
-            sender.setAutoSettle(true);
-            sender.setAutoDrained(true);
+    public void subscribe(String address, Consumer<String> eventHandler) {
+        subscriptions.put(address, eventHandler);
 
-            sender.open();
-            try {
-                if (!sender.sendQueueFull()) {
-                    Message message = message(weatherData.encode());
-                    ApplicationProperties applicationProperties = new ApplicationProperties(new LinkedHashMap<>());
-                    applicationProperties.getValue().put(weatherKey, dataContext);
-                    message.setApplicationProperties(applicationProperties);
-                    sender.send(message);
+        if (connection != null) {
+            ProtonReceiver receiver = connection.createReceiver(address);
+            ((Source) receiver.getSource()).setCapabilities(QUEUE_CAPABILITY);
+
+            receiver.handler((delivery, message) -> {
+                if (message.getBody() instanceof AmqpValue) {
+                    try {
+                        String payload = (String) ((AmqpValue) message.getBody()).getValue();
+                        eventHandler.accept(payload);
+                    } catch (Throwable t) {}
                 }
-            } finally {
-                sender.close();
-            }
-        } else {
-            LOG.info("Connection to broker is down, no data published at this time");
+            }).open().openHandler(opened -> {
+                opened.result().setPrefetch(1);
+            });
         }
     }
 
@@ -157,6 +154,9 @@ public class MessagingClient {
 
     private void connected() {
         nextDelay = 0;
+        for (Entry<String, Consumer<String>> subscription : subscriptions.entrySet()) {
+            subscribe(subscription.getKey(), subscription.getValue());
+        }
     }
 
     private int nextReconnectDelay() {
