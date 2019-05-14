@@ -49,8 +49,6 @@ public class MessagingClient {
 
     private final String hostname;
     private final int port;
-    private final String address;
-    private final String weatherKey;
 
     private ProtonConnection connection;
 
@@ -59,13 +57,11 @@ public class MessagingClient {
     // Reconnection delay tracking
     private int nextDelay;
 
-    public MessagingClient(Vertx vertx, String hostname, int port, String address, String key) {
+    public MessagingClient(Vertx vertx, String hostname, int port) {
         this.vertx = vertx;
         this.client = ProtonClient.create(vertx);
         this.hostname = hostname;
         this.port = port;
-        this.address = address;
-        this.weatherKey = key;
     }
 
     // Client API

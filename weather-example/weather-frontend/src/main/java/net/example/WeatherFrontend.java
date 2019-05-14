@@ -74,7 +74,7 @@ public class WeatherFrontend extends AbstractVerticle {
 
     private MessagingClient createAndConfigureMessagingClient() {
         MessagingClient messagingClient = new MessagingClient(
-            getVertx(), messagingHost, messagingPort, "weather.current.zipcode.22314", "weather");
+            getVertx(), messagingHost, messagingPort);
 
         messagingClient.connect();
         messagingClient.subscribe("current:zipcode:22314", latestData -> {
