@@ -1,6 +1,6 @@
 # Weather REST Frontend Example
 
-This example creates a Vert.x based application that will pull provide a REST API for querying for weather conditions from a backend service.
+This example creates a Vert.x based application that will provide a REST API for querying for weather conditions from a backend service.
 
 ## Build and publish the Docker image
 
